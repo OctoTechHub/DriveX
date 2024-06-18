@@ -4,18 +4,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import datetime
+from flask_cors import CORS
+
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = 'process.env.JWT_SECRET'
 mongo_uri = 'mongodb+srv://krishsoni:2203031050659@paytm.aujjoys.mongodb.net/'
 
-# Initialize MongoClient
 client = MongoClient(mongo_uri)
 db = client['Drive']
 users_collection = db['users']
 uploads_collection = db['uploads']
 
-# Configure upload folder and allowed extensions
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
