@@ -1,14 +1,14 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import datetime
 from flask_cors import CORS
-
+from flask import send_from_directory
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=['http://localhost:5173'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
 app.secret_key = 'process.env.JWT_SECRET'
 mongo_uri = 'mongodb+srv://krishsoni:2203031050659@paytm.aujjoys.mongodb.net/'
 
@@ -65,12 +65,16 @@ def login():
     if not user or not check_password_hash(user['password'], password):
         return jsonify({"error": "Invalid username or password"}), 400
 
+    session['username'] = username
+    session['password'] = password
+
     return jsonify({"message": "Login successful"}), 200
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    username = request.form.get('username')
-    password = request.form.get('password')
+    username = session.get('username')
+    password = session.get('password')
     file = request.files['file']
 
     if not username or not password or not file:
@@ -78,7 +82,7 @@ def upload_file():
 
     user = users_collection.find_one({"username": username})
     if not user or not check_password_hash(user['password'], password):
-        return jsonify({"error": "Invalid username or password"}), 400
+        return jsonify({"error": "Invalid username or password"}), 401
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -97,19 +101,24 @@ def upload_file():
 
     return jsonify({"error": "File type not allowed"}), 400
 
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
 @app.route('/dashboard', methods=['GET'])
 def dashboard():
-    username = request.args.get('username')
-    password = request.args.get('password')
+    if 'username' not in session or 'password' not in session:
+        return jsonify({"error": "User not logged in"}), 401
 
-    if not username or not password:
-        return jsonify({"error": "Missing required parameters"}), 400
+    username = session['username']
+    password = session['password']
 
     user = users_collection.find_one({"username": username})
     if not user or not check_password_hash(user['password'], password):
-        return jsonify({"error": "Invalid username or password"}), 400
+        return jsonify({"error": "Invalid username or password"}), 401
 
-    uploads = uploads_collection.find({"username": username})
+    uploads = list(uploads_collection.find({"username": username}))
     upload_list = [{"filename": upload["filename"], "upload_date": upload["upload_date"]} for upload in uploads]
 
     return jsonify({"message": f"Welcome to your dashboard, {username}!", "uploads": upload_list})

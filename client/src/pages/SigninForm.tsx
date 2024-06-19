@@ -14,10 +14,11 @@ const SignInForm: React.FC = () => {
       const response = await axios.post('http://localhost:5000/login', {
         username,
         password,
-      });
+      }, { withCredentials: true });
       setMessage(response.data.message);
-      localStorage.setItem('token', response.data.token);
-      navigate('/dashboard', { replace: true }); // redirect to dashboard
+      localStorage.setItem('username', username);
+      localStorage.setItem('password', password);
+      navigate(`/dashboard`, { replace: true });
     } catch (error: any) {
       setMessage(error.response.data.error as string);
     }

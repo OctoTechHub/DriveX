@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route} from 'react-router-dom';
-import SigninForm from './components/SigninForm';
-import SignUpForm from './components/SignupForm';
-import HomePage from './components/Home';
-import Upload from './components/Upload';
-import Dashboard from './components/Dashboard';
+import SigninForm from './pages/SigninForm';
+import SignUpForm from './pages/SignupForm';
+import HomePage from './pages/Home';
+import Dashboard from './pages/Dashboard';
 
 const App: React.FC = () => {
 
@@ -13,7 +12,6 @@ const App: React.FC = () => {
         <Route path="/" element={<HomePage/>} />
         <Route path="/signin" element={<SigninForm />} />
         <Route path="/signup" element={<SignUpForm />} />
-        <Route path="/upload" element={<Upload />} />
         <Route path="/dashboard" element={<Dashboard/>} />
 
       </Routes>
