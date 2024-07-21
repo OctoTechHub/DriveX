@@ -8,7 +8,9 @@ import Navbar from './components/Navbar';
 
 const Dashboard: React.FC = () => {
   const [uploads, setUploads] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false); // Loading state
+  const [loading, setLoading] = useState(false);
+  const [classificationResult, setClassificationResult] = useState<string | null>(null);
+  const [textToClassify, setTextToClassify] = useState<string>(''); // Text to classify
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,20 +30,28 @@ const Dashboard: React.FC = () => {
   }, [navigate]);
 
   const onDrop = async (acceptedFiles: File[]) => {
-    setLoading(true); // Set loading to true when starting upload
+    setLoading(true);
     const formData = new FormData();
     formData.append('file', acceptedFiles[0]);
 
     try {
-      const response = await axios.post('http://localhost:5000/upload', formData, {
+      // Upload the file
+      const uploadResponse = await axios.post('http://localhost:5000/upload', formData, {
         withCredentials: true,
       });
-      console.log(response.data);
-      setUploads([...uploads, response.data.upload]);
+      console.log(uploadResponse.data);
+      setUploads([...uploads, uploadResponse.data.upload]);
+
+      // Call the classify endpoint with the uploaded file text
+      const classifyResponse = await axios.post('http://localhost:5000/classify', { text: textToClassify }, {
+        withCredentials: true,
+      });
+      console.log(classifyResponse.data);
+      setClassificationResult(classifyResponse.data.category);
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false); // Set loading to false after upload completes (success or error)
+      setLoading(false);
     }
   };
 
@@ -68,6 +78,17 @@ const Dashboard: React.FC = () => {
     window.open(`http://localhost:5000/uploads/${filename}`, '_blank');
   };
 
+  const handleClassifyClick = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/classify', { text: textToClassify }, {
+        withCredentials: true,
+      });
+      setClassificationResult(response.data.category);
+    } catch (error) {
+      console.error('Error classifying text:', error);
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -87,6 +108,29 @@ const Dashboard: React.FC = () => {
           ) : (
             <p>Drag 'n' drop some files here, or click to select files</p>
           )}
+        </div>
+
+        {classificationResult && (
+          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
+            <h2 className="text-xl font-semibold mb-2">Classification Result</h2>
+            <p>{classificationResult}</p>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <textarea
+            value={textToClassify}
+            onChange={(e) => setTextToClassify(e.target.value)}
+            rows={4}
+            className="w-full p-2 border rounded-lg"
+            placeholder="Enter text to classify..."
+          />
+          <button
+            onClick={handleClassifyClick}
+            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg"
+          >
+            Classify Text
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

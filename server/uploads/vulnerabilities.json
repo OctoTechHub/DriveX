@@ -1,0 +1,128 @@
+[
+  {
+    "description": "A function is missing a return statement.",
+    "line": 115,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 214,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 231,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 288,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 420,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 502,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 548,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 595,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 637,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "A function is missing a return statement.",
+    "line": 700,
+    "name": "Missing Return Statement",
+    "pattern": "missing_return",
+    "severity": "low"
+  },
+  {
+    "description": "Unchecked external call detected in function 'RegisterVendor'.",
+    "line": 265,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'RegisterVendor'.",
+    "line": 269,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'Publish'.",
+    "line": 397,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'Publish'.",
+    "line": 401,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'Info'.",
+    "line": 483,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'GetPopular'.",
+    "line": 530,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'Transfer'.",
+    "line": 617,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  },
+  {
+    "description": "Unchecked external call detected in function 'Search'.",
+    "line": 682,
+    "name": "Unchecked External Calls",
+    "pattern": "unchecked_external_call",
+    "severity": "medium"
+  }
+]
