@@ -32,7 +32,6 @@ if __name__ == '__main__':
 
     learn.export('file_classifier.pkl')
 
-
     from pathlib import Path
     Path('run.txt').write_text('Script executed successfully')
 
