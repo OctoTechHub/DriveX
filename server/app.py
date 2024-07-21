@@ -10,7 +10,7 @@ import torch
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:5173'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
-app.secret_key = 'process.env.JWT_SECRET'  
+app.secret_key = 'process.env.JWT_SECRET' 
 mongo_uri = 'mongodb+srv://krishsoni:2203031050659@paytm.aujjoys.mongodb.net/'
 
 client = MongoClient(mongo_uri)
