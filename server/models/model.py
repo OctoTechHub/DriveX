@@ -1,37 +1,71 @@
-from fastai.text.all import TextDataLoaders, Learner, accuracy
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import pandas as pd
-import torch.nn as nn
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
 
-class CustomCrossEntropyLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.loss_fn = nn.CrossEntropyLoss()
+# Load data
+df = pd.read_csv(r'server/models/file_data.csv')
+texts = df['text'].tolist()
+labels = df['label'].tolist()
 
-    def forward(self, output, target):
-        logits = output.logits 
-        return self.loss_fn(logits, target)
+# Encode labels
+label_encoder = LabelEncoder()
+labels = label_encoder.fit_transform(labels)
 
-def custom_accuracy(preds, targets):
-    preds = preds.logits.argmax(dim=-1) 
-    return (preds == targets).float().mean()
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
 
-if __name__ == '__main__':
-    df = pd.read_csv('file_data.csv')
+# Vectorize text
+vectorizer = CountVectorizer()
+X_train_vec = vectorizer.fit_transform(X_train).toarray()
+X_test_vec = vectorizer.transform(X_test).toarray()
 
-    dls = TextDataLoaders.from_df(df, text_col='text', label_col='label', valid_pct=0.2, bs=32)
+# Convert to PyTorch tensors
+X_train_tensor = torch.tensor(X_train_vec, dtype=torch.float32)
+X_test_tensor = torch.tensor(X_test_vec, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+y_test_tensor = torch.tensor(y_test, dtype=torch.long)
 
-    model_name = "distilbert-base-uncased"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=dls.c)
+# Define the model
+class SimpleModel(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(SimpleModel, self).__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
 
-    learn = Learner(dls, model, loss_func=CustomCrossEntropyLoss(), metrics=custom_accuracy)
+    def forward(self, x):
+        return self.fc(x)
 
-    learn.fine_tune(4)
+input_dim = X_train_vec.shape[1]
+output_dim = len(label_encoder.classes_)
+model = SimpleModel(input_dim, output_dim)
 
-    learn.export('file_classifier.pkl')
+# Training
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=0.01)
 
-    from pathlib import Path
-    Path('run.txt').write_text('Script executed successfully')
+epochs = 5
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(X_train_tensor)
+    loss = criterion(outputs, y_train_tensor)
+    loss.backward()
+    optimizer.step()
+    print(f'Epoch {epoch+1}/{epochs}, Loss: {loss.item()}')
 
+# Evaluation
+model.eval()
+with torch.no_grad():
+    test_outputs = model(X_test_tensor)
+    _, predicted = torch.max(test_outputs, 1)
+    accuracy = accuracy_score(y_test_tensor.numpy(), predicted.numpy())
+    print(f'Accuracy: {accuracy}')
+
+# Save the model
+model_save_path = 'server/models/simple_model.pth'
+torch.save(model.state_dict(), model_save_path)
+print(f'Model saved to {model_save_path}')
