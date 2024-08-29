@@ -1,16 +1,21 @@
 from flask import Flask, request, jsonify, session, send_from_directory
+import numpy as np
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import datetime
 from flask_cors import CORS
-from fastai.text.all import load_learner
 import torch
-
+import torch.nn as nn
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import LabelEncoder
+import pickle
+import io
+import json
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:5173'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
-app.secret_key = 'process.env.JWT_SECRET' 
+CORS(app, origins=['http://localhost:5173','http://localhost:5174'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
+app.secret_key = 'process.env.JWT_SECRET'
 mongo_uri = 'mongodb+srv://krishsoni:2203031050659@paytm.aujjoys.mongodb.net/'
 
 client = MongoClient(mongo_uri)
@@ -27,21 +32,77 @@ if not os.path.exists(UPLOAD_FOLDER):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-class CustomCrossEntropyLoss(torch.nn.Module):
-    def forward(self, input, target):
-        return torch.nn.functional.cross_entropy(input, target)
+class SimpleModel(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(SimpleModel, self).__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
 
-def custom_accuracy(preds, targets):
-    return (preds.argmax(dim=-1) == targets).float().mean()
+    def forward(self, x):
+        return self.fc(x)
 
-# Path to your model
-model_path = 'D:/Python/Projects/project-mlsa/server/models/file_classifier.pkl'
-learn = None
+# Initialize model parameters
+model_path = 'server/models/simple_model.pth'
+input_dim = 1000  # Replace with the actual input dimension
+output_dim = 10   # Replace with the actual number of classes
+model = SimpleModel(input_dim, output_dim)
+
 try:
-    learn = load_learner(model_path)
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    model.eval()
     print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {str(e)}")
+
+# Load vectorizer and label_encoder from files if they exist
+vectorizer_path = 'vectorizer.pkl'
+label_encoder_path = 'label_encoder.pkl'
+
+def load_vectorizer():
+    if os.path.exists(vectorizer_path):
+        with open(vectorizer_path, 'rb') as file:
+            return pickle.load(file)
+    else:
+        raise FileNotFoundError("Vectorizer file not found.")
+
+def load_label_encoder():
+    if os.path.exists(label_encoder_path):
+        with open(label_encoder_path, 'rb') as file:
+            return pickle.load(file)
+    else:
+        raise FileNotFoundError("Label encoder file not found.")
+
+def fit_and_save_vectorizer_and_encoder():
+    # Sample training data and labels
+    texts = ["Sample text for training", "Another sample text", "More text data"]
+    labels = ["category1", "category2", "category1"]
+
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(texts)
+
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(labels)
+
+    # Save vectorizer and label encoder
+    with open(vectorizer_path, 'wb') as file:
+        pickle.dump(vectorizer, file)
+    
+    with open(label_encoder_path, 'wb') as file:
+        pickle.dump(label_encoder, file)
+
+    return vectorizer, label_encoder
+
+# Load vectorizer and label_encoder
+try:
+    vectorizer = load_vectorizer()
+    label_encoder = load_label_encoder()
+except FileNotFoundError:
+    # Fit and save if not found
+    vectorizer, label_encoder = fit_and_save_vectorizer_and_encoder()
+
+@app.route('/',methods=['GET'])
+def home():
+    return "Welcome to the Drive API!"
+
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -141,8 +202,68 @@ def dashboard():
 
     return jsonify({"message": f"Welcome to your dashboard, {username}!", "uploads": upload_list})
 
+model = None
+vectorizer = None
+label_encoder = None
+
+def load_model_and_vectorizer():
+    global model, vectorizer, label_encoder
+    # Load the model
+    model = SimpleModel(input_dim, output_dim)  # Initialize model
+    model.load_state_dict(torch.load('simple_model.pth'))  # Load model state
+    model.eval()  # Set model to evaluation mode
+
+    # Load vectorizer and label encoder
+    with open('vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    with open('label_encoder.pkl', 'rb') as f:
+        label_encoder = pickle.load(f)
+
 @app.route('/classify', methods=['POST'])
 def classify_file():
+    try:
+        if model is None or vectorizer is None or label_encoder is None:
+            load_model_and_vectorizer()  # Ensure model and vectorizer are loaded
+
+        data = request.json
+        text = data.get('text', '')
+
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+
+        print(f"Received text for classification: {text}")
+
+        # Transform the new text into a vector using the loaded vectorizer
+        new_text_vector = torch.tensor(vectorizer.transform([text]).toarray(), dtype=torch.float32)
+
+        # Make a prediction using the loaded model
+        prediction = model(new_text_vector)
+        _, predicted_class = torch.max(prediction, dim=1)
+        category = label_encoder.inverse_transform(predicted_class.numpy())
+
+        return jsonify({'category': category[0]}), 200
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+categories = {
+    'pdf': ['document', 'pdf'],
+    'image': ['image', 'picture', 'jpg', 'jpeg', 'png', 'gif'],
+    'word': ['word', 'doc', 'docx'],
+    'excel': ['excel', 'xls', 'xlsx'],
+    'powerpoint': ['powerpoint', 'ppt', 'pptx']
+}
+
+def classify_text(text):
+    text = text.lower()
+    for category, keywords in categories.items():
+        if any(keyword in text for keyword in keywords):
+            return category
+    return 'unknown'
+
+@app.route('/simple_classify', methods=['POST'])
+def simple_classify():
     try:
         data = request.json
         text = data.get('text', '')
@@ -152,18 +273,15 @@ def classify_file():
 
         print(f"Received text for classification: {text}")
 
-        if not learn:
-            raise RuntimeError('Model not loaded')
+        # Perform manual classification
+        category = classify_text(text)
 
-        print("Predicting...")
-        prediction = learn.predict(text)
-        print(f"Prediction: {prediction}")
-
-        return jsonify({'category': prediction[0]}), 200
+        return jsonify({'category': category}), 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return jsonify({'error': 'An error occurred'}), 500
-
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        
+    
 if __name__ == '__main__':
     app.run(debug=True)

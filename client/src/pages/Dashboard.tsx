@@ -6,17 +6,22 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilePdf, faFileImage, faFileWord, faFileExcel, faFilePowerpoint, faUpload } from '@fortawesome/free-solid-svg-icons';
 import Navbar from './components/Navbar';
 
+interface Upload {
+  filename: string;
+  upload_date: string; // or Date, if you process it further
+}
+
 const Dashboard: React.FC = () => {
-  const [uploads, setUploads] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [classificationResult, setClassificationResult] = useState<string | null>(null);
-  const [textToClassify, setTextToClassify] = useState<string>(''); // Text to classify
+  const [textToClassify, setTextToClassify] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/dashboard', {
+        const response = await axios.get<{ uploads: Upload[] }>('http://localhost:5000/dashboard', {
           withCredentials: true,
         });
         setUploads(response.data.uploads);
@@ -35,21 +40,23 @@ const Dashboard: React.FC = () => {
     formData.append('file', acceptedFiles[0]);
 
     try {
-      // Upload the file
-      const uploadResponse = await axios.post('http://localhost:5000/upload', formData, {
+      await axios.post<{ message: string }>('http://localhost:5000/upload', formData, {
         withCredentials: true,
       });
-      console.log(uploadResponse.data);
-      setUploads([...uploads, uploadResponse.data.upload]);
 
-      // Call the classify endpoint with the uploaded file text
-      const classifyResponse = await axios.post('http://localhost:5000/classify', { text: textToClassify }, {
-        withCredentials: true,
-      });
-      console.log(classifyResponse.data);
-      setClassificationResult(classifyResponse.data.category);
+      setUploads((prevUploads) => [
+        ...prevUploads,
+        { filename: acceptedFiles[0].name, upload_date: new Date().toISOString() }, // Adjust the date format as needed
+      ]);
+
+      if (textToClassify) {
+        const classifyResponse = await axios.post<{ category: string }>('http://localhost:5000/simple_classify', { text: textToClassify }, {
+          withCredentials: true,
+        });
+        setClassificationResult(classifyResponse.data.category);
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Error uploading file or classifying text:', error);
     } finally {
       setLoading(false);
     }
@@ -59,18 +66,19 @@ const Dashboard: React.FC = () => {
 
   const getFileIcon = (filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
-    if (extension === 'pdf') {
-      return <FontAwesomeIcon icon={faFilePdf} size="3x" className="mb-2 text-red-500" />;
-    } else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension as string)) {
-      return <FontAwesomeIcon icon={faFileImage} size="3x" className="mb-2 text-blue-500" />;
-    } else if (['doc', 'docx'].includes(extension as string)) {
-      return <FontAwesomeIcon icon={faFileWord} size="3x" className="mb-2 text-blue-700" />;
-    } else if (['xls', 'xlsx'].includes(extension as string)) {
-      return <FontAwesomeIcon icon={faFileExcel} size="3x" className="mb-2 text-green-500" />;
-    } else if (['ppt', 'pptx'].includes(extension as string)) {
-      return <FontAwesomeIcon icon={faFilePowerpoint} size="3x" className="mb-2 text-orange-500" />;
-    } else {
-      return <FontAwesomeIcon icon={faFilePdf} size="3x" className="mb-2 text-gray-500" />;
+    switch (extension) {
+      case 'pdf': return <FontAwesomeIcon icon={faFilePdf} size="3x" className="mb-2 text-red-500" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif': return <FontAwesomeIcon icon={faFileImage} size="3x" className="mb-2 text-blue-500" />;
+      case 'doc':
+      case 'docx': return <FontAwesomeIcon icon={faFileWord} size="3x" className="mb-2 text-blue-700" />;
+      case 'xls':
+      case 'xlsx': return <FontAwesomeIcon icon={faFileExcel} size="3x" className="mb-2 text-green-500" />;
+      case 'ppt':
+      case 'pptx': return <FontAwesomeIcon icon={faFilePowerpoint} size="3x" className="mb-2 text-orange-500" />;
+      default: return <FontAwesomeIcon icon={faFilePdf} size="3x" className="mb-2 text-gray-500" />;
     }
   };
 
@@ -80,7 +88,7 @@ const Dashboard: React.FC = () => {
 
   const handleClassifyClick = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/classify', { text: textToClassify }, {
+      const response = await axios.post<{ category: string }>('http://localhost:5000/simple_classify', { text: textToClassify }, {
         withCredentials: true,
       });
       setClassificationResult(response.data.category);
@@ -92,7 +100,7 @@ const Dashboard: React.FC = () => {
   return (
     <>
       <Navbar />
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto p-4 font-mono">
         <h1 className="text-2xl font-bold mb-4">Welcome Back, {localStorage.getItem('username')}!</h1>
 
         <div
@@ -111,45 +119,37 @@ const Dashboard: React.FC = () => {
         </div>
 
         {classificationResult && (
-          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
-            <h2 className="text-xl font-semibold mb-2">Classification Result</h2>
-            <p>{classificationResult}</p>
+          <div className="mb-4 p-4 bg-green-100 text-green-800 rounded">
+            <p>Classification Result: {classificationResult}</p>
           </div>
         )}
 
-        <div className="mb-4">
-          <textarea
-            value={textToClassify}
-            onChange={(e) => setTextToClassify(e.target.value)}
-            rows={4}
-            className="w-full p-2 border rounded-lg"
-            placeholder="Enter text to classify..."
-          />
-          <button
-            onClick={handleClassifyClick}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg"
-          >
-            Classify Text
-          </button>
-        </div>
+        <input
+          type="text"
+          placeholder="Enter text to classify"
+          value={textToClassify}
+          onChange={(e) => setTextToClassify(e.target.value)}
+          className="border-2 border-gray-300 p-2 rounded mb-4 w-full"
+        />
+        <button
+          onClick={handleClassifyClick}
+          className="bg-blue-500 text-white p-2 rounded"
+        >
+          Classify Text
+        </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {uploads.map((upload, index) => (
-            <div key={index} className="bg-white shadow-md rounded-lg p-4 cursor-pointer" onClick={() => handleFileClick(upload.filename)}>
-              <div className="flex items-center justify-center">
+        <h2 className="text-xl font-semibold mt-8 mb-4">Uploaded Files</h2>
+        {loading && <p>Loading...</p>}
+        <ul>
+          {uploads.map((upload) => (
+            <li key={upload.filename} className="mb-2">
+              <button onClick={() => handleFileClick(upload.filename)} className="flex items-center">
                 {getFileIcon(upload.filename)}
-              </div>
-              <p className="text-lg font-semibold text-center">{upload.filename}</p>
-              <p className="text-sm text-gray-500 text-center">{new Date(upload.upload_date).toLocaleString()}</p>
-            </div>
+                <span className="ml-2">{upload.filename}</span>
+              </button>
+            </li>
           ))}
-        </div>
-
-        {loading && (
-          <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75 text-white z-50">
-            <p>Uploading...</p>
-          </div>
-        )}
+        </ul>
       </div>
     </>
   );
