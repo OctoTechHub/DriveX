@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, session, send_from_directory
+import numpy as np
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -10,9 +11,10 @@ import torch.nn as nn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 import pickle
-
+import io
+import json
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:5173'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
+CORS(app, origins=['http://localhost:5173','http://localhost:5174'], methods=['GET', 'POST', 'PUT', 'DELETE'], supports_credentials=True)
 app.secret_key = 'process.env.JWT_SECRET'
 mongo_uri = 'mongodb+srv://krishsoni:2203031050659@paytm.aujjoys.mongodb.net/'
 
@@ -52,8 +54,8 @@ except Exception as e:
     print(f"Error loading model: {str(e)}")
 
 # Load vectorizer and label_encoder from files if they exist
-vectorizer_path = 'server/vectorizer.pkl'
-label_encoder_path = 'server/label_encoder.pkl'
+vectorizer_path = 'vectorizer.pkl'
+label_encoder_path = 'label_encoder.pkl'
 
 def load_vectorizer():
     if os.path.exists(vectorizer_path):
@@ -96,6 +98,11 @@ try:
 except FileNotFoundError:
     # Fit and save if not found
     vectorizer, label_encoder = fit_and_save_vectorizer_and_encoder()
+
+@app.route('/',methods=['GET'])
+def home():
+    return "Welcome to the Drive API!"
+
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -195,8 +202,68 @@ def dashboard():
 
     return jsonify({"message": f"Welcome to your dashboard, {username}!", "uploads": upload_list})
 
+model = None
+vectorizer = None
+label_encoder = None
+
+def load_model_and_vectorizer():
+    global model, vectorizer, label_encoder
+    # Load the model
+    model = SimpleModel(input_dim, output_dim)  # Initialize model
+    model.load_state_dict(torch.load('simple_model.pth'))  # Load model state
+    model.eval()  # Set model to evaluation mode
+
+    # Load vectorizer and label encoder
+    with open('vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    with open('label_encoder.pkl', 'rb') as f:
+        label_encoder = pickle.load(f)
+
 @app.route('/classify', methods=['POST'])
 def classify_file():
+    try:
+        if model is None or vectorizer is None or label_encoder is None:
+            load_model_and_vectorizer()  # Ensure model and vectorizer are loaded
+
+        data = request.json
+        text = data.get('text', '')
+
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+
+        print(f"Received text for classification: {text}")
+
+        # Transform the new text into a vector using the loaded vectorizer
+        new_text_vector = torch.tensor(vectorizer.transform([text]).toarray(), dtype=torch.float32)
+
+        # Make a prediction using the loaded model
+        prediction = model(new_text_vector)
+        _, predicted_class = torch.max(prediction, dim=1)
+        category = label_encoder.inverse_transform(predicted_class.numpy())
+
+        return jsonify({'category': category[0]}), 200
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+categories = {
+    'pdf': ['document', 'pdf'],
+    'image': ['image', 'picture', 'jpg', 'jpeg', 'png', 'gif'],
+    'word': ['word', 'doc', 'docx'],
+    'excel': ['excel', 'xls', 'xlsx'],
+    'powerpoint': ['powerpoint', 'ppt', 'pptx']
+}
+
+def classify_text(text):
+    text = text.lower()
+    for category, keywords in categories.items():
+        if any(keyword in text for keyword in keywords):
+            return category
+    return 'unknown'
+
+@app.route('/simple_classify', methods=['POST'])
+def simple_classify():
     try:
         data = request.json
         text = data.get('text', '')
@@ -206,20 +273,15 @@ def classify_file():
 
         print(f"Received text for classification: {text}")
 
-        if not model:
-            raise RuntimeError('Model not loaded')
+        # Perform manual classification
+        category = classify_text(text)
 
-        print("Predicting...")
-        text_tensor = torch.tensor(vectorizer.transform([text]).toarray(), dtype=torch.float32)
-        prediction = model(text_tensor)
-        _, predicted_class = torch.max(prediction, dim=1)
-        category = label_encoder.inverse_transform(predicted_class.numpy())
-
-        return jsonify({'category': category[0]}), 200
+        return jsonify({'category': category}), 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return jsonify({'error': 'An error occurred'}), 500
-
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        
+    
 if __name__ == '__main__':
     app.run(debug=True)

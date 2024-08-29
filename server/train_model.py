@@ -4,8 +4,7 @@ from transformers import DistilBertForSequenceClassification, DistilBertTokenize
 from datasets import load_dataset
 
 # Load a dataset
-df = pd.read_csv('models/file_data.csv')  # Example: IMDb movie reviews
-
+df = pd.read_csv('models/file_data.csv') 
 # Tokenizer and model
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=2)

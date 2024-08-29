@@ -6,9 +6,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
+import pickle
 
 # Load data
-df = pd.read_csv(r'server/models/file_data.csv')
+df = pd.read_csv('file_data.csv')
 texts = df['text'].tolist()
 labels = df['label'].tolist()
 
@@ -23,6 +24,12 @@ X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2
 vectorizer = CountVectorizer()
 X_train_vec = vectorizer.fit_transform(X_train).toarray()
 X_test_vec = vectorizer.transform(X_test).toarray()
+
+# Save vectorizer and label encoder
+with open('vectorizer.pkl', 'wb') as f:
+    pickle.dump(vectorizer, f)
+with open('label_encoder.pkl', 'wb') as f:
+    pickle.dump(label_encoder, f)
 
 # Convert to PyTorch tensors
 X_train_tensor = torch.tensor(X_train_vec, dtype=torch.float32)
@@ -39,8 +46,9 @@ class SimpleModel(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-input_dim = X_train_vec.shape[1]
+input_dim = X_train_vec.shape[1]  # Number of features from vectorizer
 output_dim = len(label_encoder.classes_)
+
 model = SimpleModel(input_dim, output_dim)
 
 # Training
@@ -66,6 +74,6 @@ with torch.no_grad():
     print(f'Accuracy: {accuracy}')
 
 # Save the model
-model_save_path = 'server/models/simple_model.pth'
+model_save_path = 'simple_model.pth'
 torch.save(model.state_dict(), model_save_path)
 print(f'Model saved to {model_save_path}')
